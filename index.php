@@ -4,12 +4,8 @@ require 'vendor/autoload.php';
 
 use Alfred\Workflows\Workflow;
 use GuzzleHttp\Client;
-use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Pool;
 use GuzzleHttp\RequestOptions;
-use Monolog\Level;
-use Monolog\Logger;
-use Monolog\Handler\StreamHandler;
 
 $requestOptions = [
     'timeout' => 5,
@@ -23,30 +19,33 @@ $requestUrls = [
     'user'   => 'https://v2ex.com/api/topics/show.json', //query [username]
 ];
 $avatarRoot = 'picture';
-$logRoot = 'log';
+$cacheTime = 180; //int second
 
 $client = new Client();
 $workflow = new Workflow();
-$logFileName = sprintf('%s/%s.log', $logRoot, date('Ymd'));
-$logHandler = new StreamHandler($logFileName, Level::Error);
-$logger = new Logger('ExceptionLog', [$logHandler]);
 $input = "{query}"; // replace by Alfred
 
 function loadData(string $api, array $query = []): string
 {
-    global $requestOptions, $client, $logger;
-    try {
-        $response = $client->get($api, [
-            RequestOptions::TIMEOUT => $requestOptions['timeout'],
-            RequestOptions::PROXY   => $requestOptions['proxy'],
-            RequestOptions::QUERY   => $query,
-        ]);
-    } catch (GuzzleException $e) {
-        $logger->error($e->getMessage(), $e->getTrace());
-        return '';
+    global $requestUrls, $cacheTime;
+    $fileName = array_search($api, $requestUrls) . '.cache';
+    if (file_exists($fileName) && filemtime($fileName) > (time() - $cacheTime)) {
+        return file_get_contents($fileName);
     }
 
-    return $response->getStatusCode() == 200 ? $response->getBody() : '';
+    global $requestOptions, $client;
+    $response = $client->get($api, [
+        RequestOptions::TIMEOUT => $requestOptions['timeout'],
+        RequestOptions::PROXY   => $requestOptions['proxy'],
+        RequestOptions::QUERY   => $query,
+    ]);
+
+    $data = $response->getStatusCode() == 200 ? $response->getBody() : '';
+    if (!empty($data)) {
+        file_put_contents($fileName, $data);
+    }
+
+    return $data;
 }
 
 function loadAvatar(array $avatars): void
@@ -96,23 +95,16 @@ if (empty($news)) {
 } else {
     $avatarUrls = [];
     foreach ($news as $post) {
-        try {
-            $workflow->item()
-                ->uid($post->id)
-                ->arg($post->url)
-                ->title(sprintf('%s - @%s', $post->title, $post->member->username))
-                ->subtitle($post->content)
-                ->icon($avatarRoot . parse_url($post->member->avatar_normal, PHP_URL_PATH));
-        } catch (Exception $e) {
-            $logger->error($e->getMessage(), $e->getTrace());
-        }
+        $workflow->item()
+            ->uid($post->id)
+            ->arg($post->url)
+            ->title(sprintf('%s - @%s', $post->title, $post->member->username))
+            ->subtitle($post->content)
+            ->icon($avatarRoot . parse_url($post->member->avatar_normal, PHP_URL_PATH));
+
         $avatarUrls[] = $post->member->avatar_normal;
     }
     loadAvatar($avatarUrls);
 }
 
-try {
-    $workflow->output();
-} catch (Exception $e) {
-    echo '';
-}
+$workflow->output();
