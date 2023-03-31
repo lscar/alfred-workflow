@@ -3,3 +3,5 @@ vendor/
 
 v2ex/cache/*
 wttr/cache/*
+
+.DS_Store
