@@ -55,9 +55,9 @@ function loadData(): void
 
 function processData(): Workflow
 {
-    global $type, $cacheTime, $fileName;
+    global $type, $fileName;
     $workflow = new Workflow();
-    if (file_exists($fileName) && $cacheTime < (time() - filemtime($fileName))) {
+    if (!file_exists($fileName)) {
         return $workflow;
     }
     $cityData = file_get_contents($fileName);
@@ -70,10 +70,11 @@ function processData(): Workflow
     $forecastCondition = $cityData->weather;
 
     return match ($type) {
-        'now'   => processNow($workflow, $currentCondition),
-        '2nd'   => processMultiDay($workflow, $forecastCondition, 2),
-        '3rd'   => processMultiDay($workflow, $forecastCondition, 3),
-        default => processMultiDay($workflow, $forecastCondition),
+        'now'          => processNow($workflow, $currentCondition),
+        '1st', '1', '' => processMultiDay($workflow, $forecastCondition),
+        '2nd', '2'     => processMultiDay($workflow, $forecastCondition, 2),
+        '3rd', '3'     => processMultiDay($workflow, $forecastCondition, 3),
+        default        => $workflow,
     };
 }
 
@@ -153,8 +154,8 @@ function processMultiDay(Workflow $workflow, array $forecastCondition, int $day 
 }
 
 loadData();
-cleanCache();
 $workflow = processData();
+cleanCache();
 
 if (empty($workflow->items()->all())) {
     $workflow->item()
