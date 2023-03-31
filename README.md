@@ -22,7 +22,7 @@
 * 获取指定城市（如上海）的当前天气  `wf shanghai now`
 * 获取指定城市（如上海）的今天24小时天气 `wf shanghai`或`wf shanghai 1`或`wf shanghai 1st`
 * 获取指定城市（如上海）的明天24小时天气 `wf shanghai 2`或`wf shanghai 2nd`
-* 获取指定城市（如上海）的后天24小时天气 `wf shanghai 3`或`wf shanghai 1rd`
+* 获取指定城市（如上海）的后天24小时天气 `wf shanghai 3`或`wf shanghai 3rd`
 * 更多功能添加中...
 
 <img src="https://raw.githubusercontent.com/lscar/alfred-workflow/main/wttr/icon.png" alt="wttr" width="32px" height="32px"/>
