@@ -1,6 +1,6 @@
 <?php
 
-require 'vendor/autoload.php';
+require '../vendor/autoload.php';
 
 use Alfred\Workflows\Workflow;
 use GuzzleHttp\Client;
@@ -18,7 +18,7 @@ $requestUrls = [
     'latest' => 'https://v2ex.com/api/topics/latest.json',
     'user'   => 'https://v2ex.com/api/topics/show.json', //query [username]
 ];
-$avatarRoot = 'picture';
+$avatarRoot = 'cache';
 $cacheTime = 180; //int second
 
 $client = new Client();

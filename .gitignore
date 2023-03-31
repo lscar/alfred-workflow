@@ -1,5 +1,5 @@
 vendor/
 .idea/
 
-log/*
-picture/*
+v2ex/cache/*
+wttr/cache/*
