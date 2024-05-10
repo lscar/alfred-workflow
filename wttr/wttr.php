@@ -106,7 +106,7 @@ $cityData = $cache->get($city, function (ItemInterface $item) use ($city, $clien
 
 if (empty($cityData)) {
     $workflow->item()
-        ->uid('wrrt_500')
+        ->uid('wttr_500')
         ->arg('https://wttr.in?lang=zh-cn')
         ->title('没有响应，请再试一次。')
         ->subtitle('请确保指令和网络链接正常')
