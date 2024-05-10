@@ -1,7 +1,3 @@
-vendor/
 .idea/
-
-v2ex/cache/*
-wttr/cache/*
 
 .DS_Store

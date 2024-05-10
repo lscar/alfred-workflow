@@ -1,0 +1,13 @@
+{
+    "require": {
+        "php": "^8.0",
+        "guzzlehttp/guzzle": "^7.8",
+        "joetannenbaum/alfred-workflow": "^1.1",
+        "symfony/cache": "^7.0",
+        "vlucas/phpdotenv": "^5.6"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}

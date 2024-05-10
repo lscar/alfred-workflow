@@ -1,71 +1,61 @@
 <?php
 
-require '../vendor/autoload.php';
+require 'vendor/autoload.php';
 
 use Alfred\Workflows\Workflow;
 use GuzzleHttp\Client;
 use GuzzleHttp\Pool;
 use GuzzleHttp\RequestOptions;
+use Symfony\Component\Cache\Adapter\FilesystemAdapter;
+use Symfony\Contracts\Cache\ItemInterface;
 
-$requestOptions = [
-    'timeout' => 5,
-    'proxy'   => [
-        'http'  => '127.0.0.1:7890',
-        'https' => '127.0.0.1:7890',
-    ],
-];
-$requestUrls = [
-    'latest' => 'https://v2ex.com/api/topics/latest.json',
-    'user'   => 'https://v2ex.com/api/topics/show.json', //query [username]
-];
-$avatarRoot = 'cache';
-$cacheTime = 180; //int second
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$dotenv->safeLoad();
 
 $client = new Client();
 $workflow = new Workflow();
+$cache = new FilesystemAdapter(directory: __DIR__);
 $input = "{query}"; // replace by Alfred
 
 function loadData(string $api, array $query = []): string
 {
-    global $requestUrls, $cacheTime;
-    $fileName = array_search($api, $requestUrls) . '.cache';
-    if (file_exists($fileName) && filemtime($fileName) > (time() - $cacheTime)) {
-        return file_get_contents($fileName);
-    }
-
-    global $requestOptions, $client;
-    $response = $client->get($api, [
-        RequestOptions::TIMEOUT => $requestOptions['timeout'],
-        RequestOptions::PROXY   => $requestOptions['proxy'],
-        RequestOptions::QUERY   => $query,
-    ]);
-
-    $data = $response->getStatusCode() == 200 ? $response->getBody() : '';
-    if (!empty($data)) {
-        file_put_contents($fileName, $data);
-    }
-
-    return $data;
+    global $cache, $client;
+    return $cache->get(md5($api), function (ItemInterface $item) use($api, $query, $client): string {
+        $response = $client->get($api, [
+            RequestOptions::TIMEOUT => (int)$_ENV['HTTP_TIMEOUT'],
+            RequestOptions::PROXY   => [
+                'http' => $_ENV['HTTP_PROXY'],
+                'https' => $_ENV['HTTP_PROXY_SSL'],
+            ],
+            RequestOptions::QUERY   => $query,
+        ]);
+        $success = $response->getStatusCode() == 200;
+        $item->expiresAfter($success ? (int)$_ENV['CACHE_TIME'] : 15);
+        return $success ? $response->getBody() : '';
+    });
 }
 
 function loadAvatar(array $avatars): void
 {
-    global $requestOptions, $avatarRoot, $client;
-    $requests = function () use ($client, $avatars, $requestOptions, $avatarRoot) {
-        foreach ($avatars as $avatarUrl) {
-            $filePath = $avatarRoot . parse_url($avatarUrl, PHP_URL_PATH);
-            if (!is_file($filePath)) {
-                $dirName = pathinfo($filePath, PATHINFO_DIRNAME);
+    global $client;
+    $requests = function () use ($client, $avatars) {
+        foreach ($avatars as $avatar) {
+            $file = $_ENV['CACHE_DIR'] . parse_url($avatar, PHP_URL_PATH);
+            if (!is_file($file)) {
+                $dirName = pathinfo($file, PATHINFO_DIRNAME);
                 if (!is_dir($dirName)) {
                     @mkdir($dirName, 0777, true);
                 }
-                $avatarRequestOptions = [
-                    RequestOptions::SINK    => $filePath,
-                    RequestOptions::TIMEOUT => $requestOptions['timeout'],
-                    RequestOptions::PROXY   => $requestOptions['proxy'],
+                $options = [
+                    RequestOptions::SINK    => $file,
+                    RequestOptions::TIMEOUT => (int)$_ENV['HTTP_TIMEOUT'],
+                    RequestOptions::PROXY   =>  [
+                        'http' => $_ENV['HTTP_PROXY'],
+                        'https' => $_ENV['HTTP_PROXY_SSL'],
+                    ],
                 ];
-                yield function () use ($client, $avatarUrl, $avatarRequestOptions) {
-                    return $client->getAsync($avatarUrl, $avatarRequestOptions);
+                yield function () use ($client, $avatar, $options) {
+                    return $client->getAsync($avatar, $options);
                 };
             }
         }
@@ -77,9 +67,9 @@ function loadAvatar(array $avatars): void
 }
 
 if ($input == 'n' || $input == 'new') {
-    $response = loadData($requestUrls['latest']);
+    $response = loadData($_ENV['V2EX_LATEST']);
 } else if (strpos($input, '@') == 0) {
-    $response = loadData($requestUrls['user'], ['username' => substr($input, 1)]);
+    $response = loadData($_ENV['V2EX_USER'], ['username' => substr($input, 1)]);
 } else {
     $response = '';
 }
@@ -93,18 +83,18 @@ if (empty($news)) {
         ->subtitle('请确保指令和网络链接正常')
         ->icon('icon.png');
 } else {
-    $avatarUrls = [];
+    $avatars = [];
     foreach ($news as $post) {
         $workflow->item()
             ->uid($post->id)
             ->arg($post->url)
             ->title(sprintf('%s - @%s', $post->title, $post->member->username))
             ->subtitle($post->content)
-            ->icon($avatarRoot . parse_url($post->member->avatar_normal, PHP_URL_PATH));
+            ->icon($_ENV['CACHE_DIR'] . parse_url($post->member->avatar_normal, PHP_URL_PATH));
 
-        $avatarUrls[] = $post->member->avatar_normal;
+        $avatars[] = $post->member->avatar_normal;
     }
-    loadAvatar($avatarUrls);
+    loadAvatar($avatars);
 }
 
 $workflow->output();
